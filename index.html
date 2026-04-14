@@ -3,48 +3,104 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>实时温度</title>
+<title>实时温度监测</title>
 <style>
-    body{background:#f0f4ff;font-family:Arial;text-align:center;padding:50px 0}
-    .box{background:white;max-width:320px;margin:0 auto;padding:30px;border-radius:16px;box-shadow:0 0 20px #00000010}
-    .title{font-size:18px;color:#666;margin-bottom:10px}
-    .temp{font-size:60px;font-weight:bold;color:#ff4444;margin:20px 0}
-    .time{font-size:14px;color:#999}
-    .status{font-size:12px;color:#09c;margin-top:10px}
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Microsoft YaHei', sans-serif;
+    }
+    body {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .temp-card {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 3rem 5rem;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        min-width: 350px;
+    }
+    .temp-title {
+        font-size: 1.8rem;
+        color: #333;
+        margin-bottom: 1.5rem;
+        font-weight: 600;
+    }
+    .temp-value {
+        font-size: 5rem;
+        font-weight: 700;
+        color: #ff4757;
+        line-height: 1.2;
+    }
+    .temp-unit {
+        font-size: 2rem;
+        color: #666;
+        margin-left: 0.5rem;
+    }
+    .update-time {
+        margin-top: 1.5rem;
+        font-size: 1rem;
+        color: #999;
+    }
+    .status {
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: #2ed573;
+    }
 </style>
 </head>
 <body>
-<div class="box">
-    <div class="title">当前温度</div>
-    <div class="temp" id="val">-- ℃</div>
-    <div class="time" id="time">更新时间：--</div>
-    <div class="status" id="status">加载中...</div>
-</div>
+    <div class="temp-card">
+        <h1 class="temp-title">🏠 家中实时温度</h1>
+        <div class="temp-value" id="tempValue">--<span class="temp-unit">°C</span></div>
+        <div class="update-time" id="updateTime">数据更新时间：--</div>
+        <div class="status" id="status">正在连接云平台...</div>
+    </div>
 
-<script>
-function get(){
-    fetch("https://iot-api.heclouds.com/thingmodel/query-device-property?product_id=1o65Tk1pBp&device_name=esp32_01", {
-        headers: {
-            "authorization":"version=2022-05-01&res=userid%2F508269&et=1776162635&method=sha1&sign=7ZNtGIUVk%2FYIw3vOTmjork%2FPjeY%3D"
+    <script>
+        // 用代理解决跨域，保证公网访问正常
+        const proxyUrl = "https://api.allorigins.win/get?url=";
+        const apiUrl = encodeURIComponent("https://iot-api.heclouds.com/thingmodel/query-device-property?product_id=1o65Tk1pBp&device_name=esp32_01");
+        const authHeader = "version=2022-05-01&res=userid%2F508269&et=1776162635&method=sha1&sign=7ZNtGIUVk%2FYIw3vOTmjork%2FPjeY%3D";
+
+        async function getTemperature() {
+            try {
+                const response = await fetch(proxyUrl + apiUrl, {
+                    headers: { "authorization": authHeader }
+                });
+                const result = await response.json();
+                const data = JSON.parse(result.contents);
+
+                if (data.code === 0 && data.data.length > 0) {
+                    const tempItem = data.data[0];
+                    // 更新温度
+                    document.getElementById("tempValue").innerHTML = `${tempItem.value}<span class="temp-unit">°C</span>`;
+                    // 更新时间
+                    const updateTime = new Date(tempItem.time).toLocaleString('zh-CN');
+                    document.getElementById("updateTime").textContent = `数据更新时间：${updateTime}`;
+                    // 更新状态
+                    document.getElementById("status").textContent = "✅ 数据获取成功";
+                    document.getElementById("status").style.color = "#2ed573";
+                } else {
+                    document.getElementById("status").textContent = "❌ 获取数据失败";
+                    document.getElementById("status").style.color = "#ff4757";
+                }
+            } catch (err) {
+                document.getElementById("status").textContent = `⚠️ 网络异常：${err.message}`;
+                document.getElementById("status").style.color = "#ffa502";
+            }
         }
-    })
-    .then(r=>r.json())
-    .then(d=>{
-        if(d.code===0 && d.data[0]){
-            const t = d.data[0]
-            document.getElementById('val').innerText = t.value + ' ℃'
-            document.getElementById('time').innerText = '时间：' + new Date(t.time).toLocaleString()
-            document.getElementById('status').innerText = '✅ 数据正常'
-        }else{
-            document.getElementById('status').innerText = '❌ 获取失败'
-        }
-    })
-    .catch(e=>{
-        document.getElementById('status').innerText = '⚠️ 网络异常'
-    })
-}
-get()
-setInterval(get, 3000)
-</script>
+
+        // 页面加载立即执行
+        getTemperature();
+        // 每3秒自动刷新
+        setInterval(getTemperature, 3000);
+    </script>
 </body>
 </html>
